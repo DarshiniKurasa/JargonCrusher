@@ -29,7 +29,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     
     // Layer 3: API logic - Always fetch to get tone & summary
     try {
-      const response = await fetch("http://localhost:3000/api/crush", {
+      const response = await fetch("https://jargon-crusher.vercel.app/api/crush", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

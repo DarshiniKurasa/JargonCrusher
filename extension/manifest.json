@@ -9,8 +9,7 @@
     "activeTab"
   ],
   "host_permissions": [
-    "http://localhost:3000/*",
-    "https://*.vercel.app/*",
+    "https://jargon-crusher.vercel.app/*",
     "https://*/*"
   ],
   "background": {

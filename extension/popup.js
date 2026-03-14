@@ -32,7 +32,7 @@ document.getElementById('crush-btn').addEventListener('click', async () => {
     };
 
     try {
-      const response = await fetch("http://localhost:3000/api/crush", {
+      const response = await fetch("https://jargon-crusher.vercel.app/api/crush", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: cleanedText })
