@@ -19,6 +19,17 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY || '',
 });
 
+// Simple deterministic hash for cache key
+function hashText(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return `jargon:${Math.abs(hash)}`;
+}
+
 export async function POST(req: Request) {
   try {
     // 1. Rate Limiting
@@ -45,13 +56,25 @@ export async function POST(req: Request) {
       .replace(/[^\x00-\x7F]/g, "")
       .trim();
 
-    // 3. Call Groq
+    // 3. Check cache first — same text always returns same result
+    const cacheKey = hashText(cleanText);
+    const useCache = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_URL !== 'https://example.upstash.io';
+
+    if (useCache) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+    }
+
+    // 4. Call Groq
     if (!process.env.GROQ_API_KEY) {
       return NextResponse.json({ error: 'GROQ_API_KEY missing from environment.' }, { status: 500 });
     }
 
     const completion = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant',
+      temperature: 0, // deterministic output — same input always gives same output
       messages: [
         {
           role: 'system',
@@ -90,14 +113,21 @@ Return ONLY JSON.
       return NextResponse.json({ error: 'Failed to parse LLM response' }, { status: 500 });
     }
 
-    // 4. Return Output
-    return NextResponse.json({
+    // 5. Build and cache the result
+    const result = {
       meaning: parsedResult.meaning || "Unable to extract meaning.",
       key_points: parsedResult.key_points || [],
       jargon_words: parsedResult.jargon_words || [],
       fluff_score: parsedResult.fluff_score || 0,
       tone: parsedResult.tone || "clear"
-    });
+    };
+
+    if (useCache) {
+      // Cache for 24 hours — same text, same result
+      await redis.set(cacheKey, result, { ex: 86400 });
+    }
+
+    return NextResponse.json(result);
 
   } catch (error) {
     console.error("API Error:", error);
